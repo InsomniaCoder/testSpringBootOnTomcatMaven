@@ -16,7 +16,6 @@ public class ICSJson {
     String startDate;
     String endDate;
 
-
     public ICSJson(Map<String,Object> icsJson) {
 
         this.attendeeIcs = (List<AttendeeIcs>) icsJson.get("attendee");

@@ -1,5 +1,8 @@
 package com.itoscorp.ilawyer.service.utility;
 
+import com.itoscorp.ilawyer.service.entity.AttendeeIcs;
+import com.itoscorp.ilawyer.service.entity.ICSJson;
+import com.itoscorp.ilawyer.service.entity.OrganizerIcs;
 import net.fortuna.ical4j.data.CalendarOutputter;
 import net.fortuna.ical4j.model.Calendar;
 import net.fortuna.ical4j.model.ValidationException;
@@ -8,6 +11,7 @@ import net.fortuna.ical4j.model.component.VTimeZone;
 import net.fortuna.ical4j.model.parameter.Cn;
 import net.fortuna.ical4j.model.parameter.CuType;
 import net.fortuna.ical4j.model.property.*;
+import org.springframework.stereotype.Component;
 
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -16,37 +20,30 @@ import java.net.URISyntaxException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 
 /**
  * Created by Tanat on 2/24/2016.
  */
+@Component
 public class ICSGenerator {
 
-    static SimpleDateFormat icsDateFormat =  new SimpleDateFormat("yyyyMMdd'T'hhmmss'Z'");
+    static SimpleDateFormat icsDateFormat = new SimpleDateFormat("yyyyMMdd'T'hhmmss'Z'");
 
-    public static void main(String[] args) throws URISyntaxException, ParseException {
-
-        //generate file name that unique in time
-        String dynamicICSFileName = createDynamicICSFileName();
-
-        //create instance of calendar and event
-        Calendar calendar = createCalendar();
-
-        //generate ICS file from calendar
-        generateICSFile(calendar,dynamicICSFileName);
-
-    }//end main
-
-    private static String createDynamicICSFileName() {
-
-        StringBuilder fileNameBuilder = new StringBuilder(icsDateFormat.format(new Date()));
-        fileNameBuilder.append(Math.random()/10);
-        String dynamicICSFileName = fileNameBuilder.toString()+".ics";
-        return dynamicICSFileName;
+    public void createAndSendICS(ICSJson icsJsonObj) throws URISyntaxException, ParseException {
+        //create calendar object and from json
+        Calendar calendar = createCalendar(icsJsonObj);
+        sendICSToSmtpServer(calendar);
     }
 
-    private static Calendar createCalendar() throws URISyntaxException, ParseException {
+    private Calendar createCalendar(ICSJson icsJsonObj) throws URISyntaxException, ParseException {
 
+        Calendar calendar = initialCalendarInstance();
+        createEvent(calendar, icsJsonObj);
+        return calendar;
+    }
+
+    private Calendar initialCalendarInstance() throws URISyntaxException, ParseException {
         //create iCal4J Calendar instance
         net.fortuna.ical4j.model.Calendar calendar = new net.fortuna.ical4j.model.Calendar();
 
@@ -58,52 +55,58 @@ public class ICSGenerator {
         vTimeZone.getProperties().add(new TzId("Asia/Bangkok"));
         calendar.getComponents().add(vTimeZone);
 
-        VEvent meeting = createEvent();
-        calendar.getComponents().add(meeting);
         return calendar;
     }
 
-    private static VEvent createEvent() throws URISyntaxException, ParseException {
+    private void createEvent(Calendar calendar, ICSJson icsJsonObj) throws URISyntaxException, ParseException {
 
-        //date format of ics create/start/end properties
         VEvent meeting = new VEvent();
 
-        //set attendee info
-        //for each from array of attendee
-        Attendee testAttendee1 = new Attendee("mailto:noppadorn@itoscorp.com");
-        testAttendee1.getParameters().add(new CuType("INDIVIDUAL"));
-        testAttendee1.getParameters().add(new Cn("พี่เหลียง"));
+        List<AttendeeIcs> attendeeIcs = icsJsonObj.getAttendeeIcs();
+        OrganizerIcs organizerIcs = icsJsonObj.getOrganizerIcs();
+        String location = icsJsonObj.getLocation();
+        String description = icsJsonObj.getDescription();
+        String summary = icsJsonObj.getSummary();
+        String startDate = icsJsonObj.getStartDate();
+        String endDate = icsJsonObj.getEndDate();
 
-        Attendee testAttendee2 = new Attendee("mailto:tanat@itoscorp.com");
-        testAttendee2.getParameters().add(new CuType("INDIVIDUAL"));
-        testAttendee2.getParameters().add(new Cn("ปอ"));
-        meeting.getProperties().add(testAttendee1);
-        meeting.getProperties().add(testAttendee2);
+        for (AttendeeIcs attendee : attendeeIcs) {
 
+            Attendee eachAttendee = new Attendee("mailto:"+attendee.getMailTo());
+            eachAttendee.getParameters().add(new CuType("INDIVIDUAL"));
+            eachAttendee.getParameters().add(new Cn(attendee.getCn()));
+            meeting.getProperties().add(eachAttendee);
+        }
+
+        //set Date info
         String strDate = icsDateFormat.format(new Date());
-
-        net.fortuna.ical4j.model.Date startDt = new net.fortuna.ical4j.model.Date(strDate,icsDateFormat.toPattern());
         meeting.getProperties().add(new Created(strDate));
-        meeting.getProperties().add(new DtStart(strDate));
-        meeting.getProperties().add(new DtEnd(strDate));
+        meeting.getProperties().add(new DtStart(startDate));
+        meeting.getProperties().add(new DtEnd(endDate));
 
         //set general info
-        meeting.getProperties().add(new Location("ITOS Office"));
-        meeting.getProperties().add(new Description("Testing purpose description"));
-        meeting.getProperties().add(new Summary("iLawyer Test Header"));
+        meeting.getProperties().add(new Location(location));
+        meeting.getProperties().add(new Description(description));
+        meeting.getProperties().add(new Summary(summary));
+
         //set organizer info
-        Organizer organizer = new Organizer("mailto:"+"tanat@itoscorp.com");
-        organizer.getParameters().add(new Cn("Por Por"));
+        Organizer organizer = new Organizer("mailto:" + organizerIcs.getMailTo());
+        organizer.getParameters().add(new Cn(organizerIcs.getCn()));
         meeting.getProperties().add(organizer);
 
-        return meeting;
+        //attach event to main calendar
+        calendar.getComponents().add(meeting);
     }
 
-    private static void generateICSFile(Calendar calendar, String dynamicICSFileName) {
+
+    private void sendICSToSmtpServer(Calendar calendar) {
+
+        String dynamicICSFileName = createDynamicICSFileName();
+
         FileOutputStream fileOutputStream = null;
 
         try {
-            //open output stream to dynamic file
+            //create File at SMTP outgoing directory
             fileOutputStream = new FileOutputStream(dynamicICSFileName);
         } catch (FileNotFoundException e) {
             e.printStackTrace();
@@ -119,6 +122,13 @@ public class ICSGenerator {
         } catch (ValidationException e) {
             e.printStackTrace();
         }
+    }
 
+    private String createDynamicICSFileName() {
+
+        StringBuilder fileNameBuilder = new StringBuilder(icsDateFormat.format(new Date()));
+        fileNameBuilder.append(Math.random() / 10);
+        String dynamicICSFileName = fileNameBuilder.toString() + ".ics";
+        return dynamicICSFileName;
     }
 }//end class
