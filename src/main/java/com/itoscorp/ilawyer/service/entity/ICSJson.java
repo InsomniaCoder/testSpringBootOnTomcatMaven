@@ -1,7 +1,6 @@
 package com.itoscorp.ilawyer.service.entity;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Created by Tanat on 2/26/2016.
@@ -18,16 +17,31 @@ public class ICSJson {
 
     public ICSJson(Map<String,Object> icsJson) {
 
-        this.attendeeIcs = (List<AttendeeIcs>) icsJson.get("attendee");
+        //string value
         this.location = (String) icsJson.get("location");
         this.description = (String) icsJson.get("description");
         this.summary = (String) icsJson.get("summary");
         this.startDate = (String) icsJson.get("startDate");
         this.endDate = (String) icsJson.get("endDate");
+
+        //object value
         Map<String,Object> organizerMap = (Map<String, Object>) icsJson.get("organizer");
         this.organizerIcs = new OrganizerIcs();
         this.organizerIcs.mailTo = (String) organizerMap.get("mailto");
         this.organizerIcs.cn = (String) organizerMap.get("cn");
+
+        List<LinkedHashMap> attendeeObj = (List<LinkedHashMap>) icsJson.get("attendee");
+        List<AttendeeIcs> attendeeIcsList = new ArrayList<AttendeeIcs>();
+        for (Object att : attendeeObj) {
+            Map<String,Object> eactAttendee = (Map<String, Object>) att;
+            AttendeeIcs attendeeIcs = new AttendeeIcs();
+            attendeeIcs.setMailTo((String) eactAttendee.get("mailto"));
+            attendeeIcs.setCn((String) eactAttendee.get("cn"));
+            attendeeIcsList.add(attendeeIcs);
+        }
+
+        this.attendeeIcs = attendeeIcsList;
+
     }
 
     public List<AttendeeIcs> getAttendeeIcs() {

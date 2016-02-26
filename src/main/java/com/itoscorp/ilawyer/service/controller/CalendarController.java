@@ -28,7 +28,6 @@ public class CalendarController {
         ICSJson icsJsonObj = new ICSJson(icsJson);
         //generate file and send
         icsGenerator.createAndSendICS(icsJsonObj);
-
         return String.valueOf(HttpStatus.OK);
     }//end send
 

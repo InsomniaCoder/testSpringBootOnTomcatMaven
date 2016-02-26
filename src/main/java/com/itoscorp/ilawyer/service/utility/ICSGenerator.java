@@ -13,6 +13,15 @@ import net.fortuna.ical4j.model.parameter.CuType;
 import net.fortuna.ical4j.model.property.*;
 import org.springframework.stereotype.Component;
 
+import javax.activation.DataHandler;
+import javax.activation.DataSource;
+import javax.activation.FileDataSource;
+import javax.mail.*;
+import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeBodyPart;
+import javax.mail.internet.MimeMessage;
+import javax.mail.internet.MimeMultipart;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -21,6 +30,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
+import java.util.Properties;
 
 /**
  * Created by Tanat on 2/24/2016.
@@ -33,7 +43,8 @@ public class ICSGenerator {
     public void createAndSendICS(ICSJson icsJsonObj) throws URISyntaxException, ParseException {
         //create calendar object and from json
         Calendar calendar = createCalendar(icsJsonObj);
-        sendICSToSmtpServer(calendar);
+        File icsFile = createICSFile(calendar);
+        sendICSViaJavaMailAPI(icsJsonObj,icsFile);
     }
 
     private Calendar createCalendar(ICSJson icsJsonObj) throws URISyntaxException, ParseException {
@@ -99,15 +110,16 @@ public class ICSGenerator {
     }
 
 
-    private void sendICSToSmtpServer(Calendar calendar) {
+    private File createICSFile(Calendar calendar) {
 
         String dynamicICSFileName = createDynamicICSFileName();
 
         FileOutputStream fileOutputStream = null;
 
+        File icsFile = new File(dynamicICSFileName);
         try {
             //create File at SMTP outgoing directory
-            fileOutputStream = new FileOutputStream(dynamicICSFileName);
+            fileOutputStream = new FileOutputStream(icsFile);
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
@@ -122,7 +134,11 @@ public class ICSGenerator {
         } catch (ValidationException e) {
             e.printStackTrace();
         }
+
+        return icsFile;
     }
+
+
 
     private String createDynamicICSFileName() {
 
@@ -130,5 +146,81 @@ public class ICSGenerator {
         fileNameBuilder.append(Math.random() / 10);
         String dynamicICSFileName = fileNameBuilder.toString() + ".ics";
         return dynamicICSFileName;
+    }
+
+    private void sendICSViaJavaMailAPI(ICSJson icsJsonObj, File icsFile){
+
+        final String host = "mail.itoscorp.com";
+
+        String from = icsJsonObj.getOrganizerIcs().getMailTo();
+        String subject = icsJsonObj.getSummary();
+        String messageText = icsJsonObj.getDescription();
+
+        Properties props = System.getProperties();
+        props.put("mail.smtp.auth", "false");
+        props.put("mail.smtp.host", host);
+        props.put("mail.smtp.localhost", "mail.itoscorp.com");
+
+        // Get the authenticated session object.
+       /* Session session = Session.getInstance(props,
+                new javax.mail.Authenticator() {
+                    protected PasswordAuthentication getPasswordAuthentication() {
+                        return new PasswordAuthentication(username, password);
+                    }
+                });*/
+        Session session = Session.getDefaultInstance(props, null);
+
+        List<AttendeeIcs> attendeeIcs = icsJsonObj.getAttendeeIcs();
+
+        for (AttendeeIcs attendeeIc : attendeeIcs) {
+
+            String to = attendeeIc.getMailTo();
+
+            try {
+                // Create a default MimeMessage object.
+                Message message = new MimeMessage(session);
+
+                // Set From: header field of the header.
+                message.setFrom(new InternetAddress(from));
+
+                // Set To: header field of the header.
+                message.setRecipients(Message.RecipientType.TO,
+                        InternetAddress.parse(to));
+
+                // Set Subject: header field
+                message.setSubject(subject);
+
+                // Create the message part
+                BodyPart messageBodyPart = new MimeBodyPart();
+
+                // Now set the actual message
+                messageBodyPart.setText(messageText);
+
+                // Create a multipart message
+                Multipart multipart = new MimeMultipart();
+
+                // Set text message part
+                multipart.addBodyPart(messageBodyPart);
+
+                // Part two is attachment
+                messageBodyPart = new MimeBodyPart();
+                DataSource source = new FileDataSource(icsFile);
+                messageBodyPart.setDataHandler(new DataHandler(source));
+                messageBodyPart.setFileName("ics");
+                multipart.addBodyPart(messageBodyPart);
+
+                // Send the complete message parts
+                message.setContent(multipart);
+
+                // Send message
+                Transport.send(message);
+
+                System.out.println("Sent message successfully....");
+
+            } catch (MessagingException e) {
+                throw new RuntimeException(e);
+            }
+
+        }
     }
 }//end class
