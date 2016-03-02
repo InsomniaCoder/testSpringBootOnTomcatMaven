@@ -150,26 +150,24 @@ public class ICSGenerator {
 
     private void sendICSViaJavaMailAPI(ICSJson icsJsonObj, File icsFile){
 
-        final String host = "mail.itoscorp.com";
 
         String from = icsJsonObj.getOrganizerIcs().getMailTo();
         String subject = icsJsonObj.getSummary();
         String messageText = icsJsonObj.getDescription();
 
         Properties props = System.getProperties();
-        props.put("mail.smtp.auth", "false");
-        props.put("mail.smtp.host", host);
-        props.put("mail.smtp.localhost", "mail.itoscorp.com");
+        props.put("mail.smtp.auth", "true");
+        props.put("mail.smtp.starttls.enable", "true");
+        props.put("mail.smtp.host", "smtp.gmail.com");
+        props.put("mail.smtp.port", "587");
 
-        // Get the authenticated session object.
-       /* Session session = Session.getInstance(props,
+
+        Session session = Session.getInstance(props,
                 new javax.mail.Authenticator() {
                     protected PasswordAuthentication getPasswordAuthentication() {
-                        return new PasswordAuthentication(username, password);
+                        return new PasswordAuthentication("tanat@itoscorp.com", "tanat12345");
                     }
-                });*/
-        Session session = Session.getDefaultInstance(props, null);
-
+                });
         List<AttendeeIcs> attendeeIcs = icsJsonObj.getAttendeeIcs();
 
         for (AttendeeIcs attendeeIc : attendeeIcs) {
