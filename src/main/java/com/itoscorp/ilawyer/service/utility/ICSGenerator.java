@@ -38,7 +38,7 @@ public class ICSGenerator {
 
     static SimpleDateFormat icsDateFormat = new SimpleDateFormat("yyyyMMdd'T'hhmmss'Z'");
 
-    public void createAndSendICS(ICSJson icsJsonObj) throws URISyntaxException, ParseException {
+    public void createAndSendICS(ICSJson icsJsonObj) throws URISyntaxException, ParseException, IOException {
         //create calendar object and from json
         Calendar calendar = createCalendar(icsJsonObj);
         File icsFile = createICSFile(calendar);
@@ -115,6 +115,7 @@ public class ICSGenerator {
         FileOutputStream fileOutputStream = null;
 
         File icsFile = new File(dynamicICSFileName);
+
         try {
             //create File at SMTP outgoing directory
             fileOutputStream = new FileOutputStream(icsFile);
@@ -132,7 +133,11 @@ public class ICSGenerator {
         } catch (ValidationException e) {
             e.printStackTrace();
         }
-
+        try {
+            fileOutputStream.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         return icsFile;
     }
 
@@ -140,12 +145,12 @@ public class ICSGenerator {
     private String createDynamicICSFileName() {
 
         StringBuilder fileNameBuilder = new StringBuilder(icsDateFormat.format(new Date()));
-        fileNameBuilder.append(Math.random() / 10);
+        fileNameBuilder.append((int) Math.random() % 9);
         String dynamicICSFileName = fileNameBuilder.toString() + ".ics";
         return dynamicICSFileName;
     }
 
-    private void sendICSViaJavaMailAPI(ICSJson icsJsonObj, File icsFile) {
+    private void sendICSViaJavaMailAPI(ICSJson icsJsonObj, File icsFile) throws IOException {
 
         String from = icsJsonObj.getOrganizerIcs().getMailTo();
         String subject = icsJsonObj.getSummary();
@@ -210,13 +215,19 @@ public class ICSGenerator {
                 Transport.send(message);
 
                 System.out.println("Sent message successfully....");
-                icsFile.delete();
+
+
+                FileUtils.forceDelete(icsFile.getAbsoluteFile());
+
 
             } catch (MessagingException e) {
                 throw new RuntimeException(e);
+            } catch (FileNotFoundException e) {
+
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
+
         }
     }
 }//end class

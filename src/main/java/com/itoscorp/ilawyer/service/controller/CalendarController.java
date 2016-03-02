@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.net.URISyntaxException;
 import java.text.ParseException;
 import java.util.Map;
@@ -14,6 +15,7 @@ import java.util.Map;
  * Created by Tanat on 2/24/2016.
  */
 @RestController
+@RequestMapping(value = "/service")
 public class CalendarController {
 
 
@@ -22,7 +24,7 @@ public class CalendarController {
 
     @RequestMapping(value = "/sendICSInvite", method = RequestMethod.POST)
     public String sendICSInvite(
-            @RequestBody Map<String,Object> icsJson) throws URISyntaxException, ParseException {
+            @RequestBody Map<String,Object> icsJson) throws URISyntaxException, ParseException, IOException {
 
         //transform JSON from request body to Object
         ICSJson icsJsonObj = new ICSJson(icsJson);
