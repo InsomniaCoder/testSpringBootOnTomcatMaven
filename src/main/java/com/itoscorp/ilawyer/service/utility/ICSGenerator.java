@@ -11,20 +11,18 @@ import net.fortuna.ical4j.model.component.VTimeZone;
 import net.fortuna.ical4j.model.parameter.Cn;
 import net.fortuna.ical4j.model.parameter.CuType;
 import net.fortuna.ical4j.model.property.*;
+import net.fortuna.ical4j.model.property.Version;
+import org.apache.commons.io.FileUtils;
 import org.springframework.stereotype.Component;
 
 import javax.activation.DataHandler;
-import javax.activation.DataSource;
-import javax.activation.FileDataSource;
 import javax.mail.*;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeMessage;
 import javax.mail.internet.MimeMultipart;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import javax.mail.util.ByteArrayDataSource;
+import java.io.*;
 import java.net.URISyntaxException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -44,7 +42,7 @@ public class ICSGenerator {
         //create calendar object and from json
         Calendar calendar = createCalendar(icsJsonObj);
         File icsFile = createICSFile(calendar);
-        sendICSViaJavaMailAPI(icsJsonObj,icsFile);
+        sendICSViaJavaMailAPI(icsJsonObj, icsFile);
     }
 
     private Calendar createCalendar(ICSJson icsJsonObj) throws URISyntaxException, ParseException {
@@ -83,7 +81,7 @@ public class ICSGenerator {
 
         for (AttendeeIcs attendee : attendeeIcs) {
 
-            Attendee eachAttendee = new Attendee("mailto:"+attendee.getMailTo());
+            Attendee eachAttendee = new Attendee("mailto:" + attendee.getMailTo());
             eachAttendee.getParameters().add(new CuType("INDIVIDUAL"));
             eachAttendee.getParameters().add(new Cn(attendee.getCn()));
             meeting.getProperties().add(eachAttendee);
@@ -139,7 +137,6 @@ public class ICSGenerator {
     }
 
 
-
     private String createDynamicICSFileName() {
 
         StringBuilder fileNameBuilder = new StringBuilder(icsDateFormat.format(new Date()));
@@ -148,24 +145,24 @@ public class ICSGenerator {
         return dynamicICSFileName;
     }
 
-    private void sendICSViaJavaMailAPI(ICSJson icsJsonObj, File icsFile){
-
+    private void sendICSViaJavaMailAPI(ICSJson icsJsonObj, File icsFile) {
 
         String from = icsJsonObj.getOrganizerIcs().getMailTo();
         String subject = icsJsonObj.getSummary();
         String messageText = icsJsonObj.getDescription();
 
         Properties props = System.getProperties();
-        props.put("mail.smtp.auth", "true");
-        props.put("mail.smtp.starttls.enable", "true");
         props.put("mail.smtp.host", "smtp.gmail.com");
-        props.put("mail.smtp.port", "587");
-
+        props.put("mail.smtp.socketFactory.port", "465");
+        props.put("mail.smtp.socketFactory.class",
+                "javax.net.ssl.SSLSocketFactory");
+        props.put("mail.smtp.auth", "true");
+        props.put("mail.smtp.port", "465");
 
         Session session = Session.getInstance(props,
                 new javax.mail.Authenticator() {
                     protected PasswordAuthentication getPasswordAuthentication() {
-                        return new PasswordAuthentication("tanat@itoscorp.com", "tanat12345");
+                        return new PasswordAuthentication("info@itoscorp.com", "inf12345");
                     }
                 });
         List<AttendeeIcs> attendeeIcs = icsJsonObj.getAttendeeIcs();
@@ -202,9 +199,8 @@ public class ICSGenerator {
 
                 // Part two is attachment
                 messageBodyPart = new MimeBodyPart();
-                DataSource source = new FileDataSource(icsFile);
-                messageBodyPart.setDataHandler(new DataHandler(source));
-                messageBodyPart.setFileName("ics");
+                messageBodyPart.setDataHandler(new DataHandler(new ByteArrayDataSource(new ByteArrayInputStream(FileUtils.readFileToByteArray(icsFile)),
+                        "text/calendar;method=REQUEST;charset=\"UTF-8\"")));
                 multipart.addBodyPart(messageBodyPart);
 
                 // Send the complete message parts
@@ -214,11 +210,13 @@ public class ICSGenerator {
                 Transport.send(message);
 
                 System.out.println("Sent message successfully....");
+                icsFile.delete();
 
             } catch (MessagingException e) {
                 throw new RuntimeException(e);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
-
         }
     }
 }//end class
