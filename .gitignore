@@ -1,3 +1,7 @@
 .idea/
 target/
 iLawyerService.iml
+.classpath
+.project
+iLawyerService.eml
+/.classpath
