@@ -14,6 +14,7 @@ import java.util.Map;
  * Created by Tanat on 2/24/2016.
  */
 @RestController
+@RequestMapping(value = "/")
 public class CalendarController {
 
 
